@@ -1,26 +1,22 @@
-from lib.solver import Board
+from lib.typing import Board
+import numpy as np
 from typing import (
-    List
+    TextIO
 )
 
 
-def parse_file(filepath: str) -> Board:
+def sudoku_read(reader: TextIO, n: int = 9) -> Board:
     board = []
-    with open(filepath, 'r') as fd:
-        n = int(fd.readline())
-        for _ in range(n*n):
-            board.append(list(map(int, fd.readline().split(' '))))
-    return board
+    for _ in range(n):
+        board.append(list(map(int, reader.readline().split(' '))))
+    return np.array(board)
 
 
-def parse_file2(filepath: str) -> List[Board]:
-    boards = []
-    with open(filepath, 'r') as fd:
-        for i in range(10):
-            fd.readline()
-            board = []
-            for _ in range(9):
-                board.append(list(map(int, list(fd.readline()[:-1]))))
-            boards.append(board)
-
-    return boards
+def sudoku_write(writer: TextIO, state: Board):
+    for i in range(9):
+        for j in range(9):
+            writer.write(str(state[i][j]))
+            if j != 8:
+                writer.write(' ')
+        if i != 8:
+            writer.write('\n')
