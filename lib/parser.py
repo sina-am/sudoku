@@ -12,7 +12,7 @@ def sudoku_read(reader: TextIO, n: int = 9) -> Board:
     return np.array(board)
 
 
-def sudoku_write(writer: TextIO, state: Board):
+def sudoku_write(writer: TextIO, state: Board, end: str = ''):
     for i in range(9):
         for j in range(9):
             writer.write(str(state[i][j]))
@@ -20,3 +20,6 @@ def sudoku_write(writer: TextIO, state: Board):
                 writer.write(' ')
         if i != 8:
             writer.write('\n')
+
+    if end:
+        writer.write(end)
