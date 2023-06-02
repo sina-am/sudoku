@@ -1,46 +1,31 @@
-from lib.errors import ImpossibleSudokuError
 import numpy as np
-from dataclasses import dataclass
 from typing import (
-    Dict, Tuple, Set, List
+    Dict, Tuple, Set
 )
 from lib.typing import Board
 
 
-@dataclass
-class Domain:
-    index: Tuple[int, int]
-    possible_values: Set[int]
-
-    def __lt__(self, other):
-        return len(self.possible_values) < len(other.possible_values)
-
-    def __eq__(self, other):
-        return len(self.possible_values) == len(other.possible_values)
-
-
-class CSPSudoku:
+class Sudoku:
     board: Board
-    domains: List[Domain]
+    possible_values: Dict[Tuple[int, int], Set[int]]
 
-    def __init__(self, board: Board):
+    def __init__(self, board: Board, possible_values=None):
         self.board = np.copy(board)
-        self.find_domains()
 
-    def find_mrv(self) -> Domain:
-        return min(self.domains)
+        if possible_values is None:
+            self.possible_values = self.initial_possible_values()
+        else:
+            self.possible_values = possible_values
 
-    def find_domains(self):
-        self.domains = []
+    def initial_possible_values(self) -> Dict[Tuple[int, int], Set[int]]:
+        possibilities = dict()
 
-        for i in range(len(self.board)):
-            for j in range(len(self.board)):
+        for i in range(0, 9):
+            for j in range(0, 9):
                 if self.board[i][j] == 0:
-                    possible_values = self.find_domain(i, j)
-                    if not len(possible_values):
-                        raise ImpossibleSudokuError("domain is empty")
+                    possibilities[(j, i)] = self.find_domain(i, j)
 
-                    self.domains.append(Domain(index=(i, j), possible_values=possible_values))
+        return possibilities
 
     def find_domain(self, row: int, col: int) -> Set[int]:
         domain = {1, 2, 3, 4, 5, 6, 7, 8, 9}
@@ -58,31 +43,6 @@ class CSPSudoku:
 
         return domain
 
-
-class AC3Sudoku:
-    board: Board
-    possible_values: Dict[Tuple[int, int], Set[int]]
-
-    def __init__(self, board: Board, related_cells, possible_values=None):
-        self.board = np.copy(board)
-        self.related_cells = related_cells
-
-        if possible_values is None:
-            self.possible_values = self.initial_possible_values()
-        else:
-            self.possible_values = possible_values
-
-    # initial possible values without any pruning
-    def initial_possible_values(self) -> Dict[Tuple[int, int], Set[int]]:
-        possibilities = dict()
-
-        for i in range(0, 9):
-            for j in range(0, 9):
-                if self.board[i][j] == 0:
-                    possibilities[(j, i)] = set(range(1, 10))
-
-        return possibilities
-
     def is_finished(self):
         return len(self.possible_values) == 0
 
@@ -92,7 +52,6 @@ class AC3Sudoku:
                 return False
         return True
 
-    # set a value in a coordinate, cascading all updates for forward checking
     def set_value(self, coords, value):
         if coords not in self.possible_values or value not in self.possible_values[coords]:
             return False
@@ -100,8 +59,7 @@ class AC3Sudoku:
         self.board[coords[1]][coords[0]] = value
         del self.possible_values[coords]
 
-        # update all related cells
-        for related in self.related_cells[coords]:
+        for related in RELATED_CELLS[coords]:
             if related not in self.possible_values:
                 if self.board[related[1]][related[0]] == value:
                     return False
@@ -158,3 +116,6 @@ def get_related_cells(coords):
     related_set.remove(coords)
 
     return related_set
+
+
+RELATED_CELLS = calculate_relations()

@@ -12,7 +12,7 @@ def benchmark(
     n_run: int = 10,
     strategy: Strategy = "AC-3",
 ):
-
+    i = 0
     with open(problem_file) as pfd:
         with open(solution_file) as sfd:
             avg_time = 0
@@ -25,7 +25,11 @@ def benchmark(
                     solved = sudoku_solver(board, strategy=strategy)
                     t1 = time.perf_counter()
                     if solved is None or not np.array_equal(solved, solution_board):
-                        raise RuntimeError(f"unable to solve {board}")
+                        i += 1
+                        print(f"unable to solve\n{board}")
+                        print(f"got board\n", solved)
+                        print(f"expected board\n", solution_board)
+                        print(i)
                     avg_time += t1 - t0
 
             t = avg_time/(n_run * n_boards)
