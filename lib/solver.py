@@ -1,40 +1,29 @@
+import abc
 import copy
-import threading
-import io
 import random
-import sys
+import time
+import numpy as np
 from typing import Union
 
-import numpy as np
-
-from lib.parser import sudoku_write
 from lib.typing import Board, Strategy
 from lib.sudoku import RELATED_CELLS, Sudoku
 
 
-class Screen():
-    def __init__(self):
-        self.buffer = io.StringIO('')
-
-    def render(self, board: Board):
-        self.buffer.write('\033c')
-        sudoku_write(self.buffer, board)
-        self.buffer.seek(0, io.SEEK_SET)
-        sys.stdout.write(self.buffer.read())
+class Solver(abc.ABC):
+    @abc.abstractmethod
+    def solve(self) -> Union[Board, None]:
+        raise NotImplementedError
 
 
-class HillClimbingSolver:
-    def __init__(self, board: Board, display: bool = False, max_iter: int = 10_000) -> None:
+class HillClimbingSolver(Solver):
+    def __init__(self, board: Board, max_iter: int = 100_000) -> None:
         self.max_iter = max_iter
         self.n_iter = 0
         self.board = np.copy(board)
         self.sudoku = Sudoku(board)
-        self.display = display
+        self.epsilon = 0.3
 
-        if self.display:
-            self.screen = Screen()
-
-    def random_populate(self, sudoku):
+    def random_populate(self, sudoku: Sudoku):
         for i in range(len(sudoku.board)):
             for j in range(len(sudoku.board)):
                 if sudoku.board[i][j] == 0:
@@ -46,9 +35,7 @@ class HillClimbingSolver:
         for i in range(len(board)):
             if row != i and board[row][col] == board[i][col]:
                 conflicts += 1
-
-        for j in range(len(board)):
-            if col != j and board[row][col] == board[row][j]:
+            if col != i and board[row][col] == board[row][i]:
                 conflicts += 1
 
         i_box = (row//3) * 3
@@ -71,36 +58,30 @@ class HillClimbingSolver:
     def _solve(self) -> bool:
         sudoku = copy.deepcopy(self.sudoku)
 
-        while (not sudoku.is_finished()):
+        while not sudoku.is_finished():
             queue = [(k, v) for k, v in sudoku.possible_values.items()]
-            queue.sort(key=lambda item: len(item[1]))
+            coords, values = min(queue, key=lambda item: len(item[1]))
 
-            first_coords, first_numbers = queue[0]
-            if len(first_numbers) == 1:
-                if not sudoku.set_value(first_coords, next(iter(first_numbers))):
+            if len(values) == 1:
+                if not sudoku.set_value(coords, next(iter(values))):
                     return False
-                break
+                continue
 
             self.random_populate(sudoku)
-            min_conflict = self.heuristic(self.board)
-            new_value = 0
-            new_coords = first_coords
+            min_conflict = float('inf')
+            best_value = 0
 
-            for coords, numbers in queue:
-                if len(numbers) != len(first_numbers):
-                    break
-                for n in numbers:
-                    temp_n = self.board[coords[1]][coords[0]]
-                    self.board[coords[1]][coords[0]] = n
-                    h = self.heuristic(self.board)
-                    self.board[coords[1]][coords[0]] = temp_n
+            for value in values:
+                temp_val = self.board[coords[1]][coords[0]]
+                self.board[coords[1]][coords[0]] = value
+                h = self.heuristic(self.board)
+                self.board[coords[1]][coords[0]] = temp_val
 
-                    if (h < min_conflict or min_conflict == -1) or (random.random() < 0.3):
-                        min_conflict = h
-                        new_value = n
-                        new_coords = coords
+                if (h < min_conflict) or (random.random() < self.epsilon):
+                    min_conflict = h
+                    best_value = value
 
-            if not sudoku.set_value(new_coords, new_value):
+            if not sudoku.set_value(coords, best_value):
                 return False
 
         self.sudoku = sudoku
@@ -113,19 +94,17 @@ class HillClimbingSolver:
                 return self.sudoku.board
 
 
-class CSPSolver:
+class CSPSolver(Solver):
     def __init__(self, sudoku: Board, possible_values=None):
         self.sudoku = Sudoku(sudoku, possible_values)
         self.is_valid = True
 
     def apply_value(self, coord, value):
-        new_possible_values = dict()
-        for k, v in self.sudoku.possible_values.items():
-            new_possible_values[k] = v.copy()
-
+        new_possible_values = {k: v.copy() for k, v in self.sudoku.possible_values.items()}
+        new_board = np.copy(self.sudoku.board)
         new_solver = self.__class__(
-            self.sudoku.board,
-            new_possible_values
+            new_board,
+            new_possible_values,
         )
 
         new_solver.is_valid = new_solver.sudoku.set_value(coord, value)
@@ -134,19 +113,14 @@ class CSPSolver:
 
     def search(self):
         queue = [(k, v) for k, v in self.sudoku.possible_values.items()]
-        queue.sort(key=lambda item: len(item[1]))
+        coords, values = min(queue, key=lambda item: len(item[1]))
 
-        while len(queue) > 0:
-            coords, poss = queue.pop(0)
+        for value in values:
+            new_solver = self.apply_value(coords, value)
 
-            for value in poss:
-                new_solver = self.apply_value(coords, value)
-
-                if new_solver.solve() is not None:
-                    self.sudoku = new_solver.sudoku
-                    return True
-
-            break
+            if new_solver.solve() is not None:
+                self.sudoku = new_solver.sudoku
+                return True
 
         return False
 
@@ -157,9 +131,6 @@ class CSPSolver:
         if self.sudoku.is_finished() and self.is_valid:
             return self.sudoku.board
 
-        if not self.is_valid:
-            return None
-
         solved = self.search()
         if solved:
             return self.sudoku.board
@@ -168,14 +139,13 @@ class CSPSolver:
 
 
 class AC3Solver(CSPSolver):
-    def __init__(self, sudoku, possible_values=None):
-        super().__init__(sudoku, possible_values)
-        if possible_values == None:
+    def __init__(self, sudoku, possible_values=None, *args, **kwargs):
+        super().__init__(sudoku, possible_values, *args, **kwargs)
+        if possible_values is None:
             self.ac3_all()
             self.is_valid = self.sudoku.is_valid()
 
     def ac3_all(self):
-        sudoku = self.sudoku
         queue = self.sudoku.get_unfinished_possible_values()
 
         while len(queue) > 0:
@@ -187,31 +157,29 @@ class AC3Solver(CSPSolver):
             changed = False
 
             for related in r_all:
-                if element not in sudoku.possible_values:
+                if element not in self.sudoku.possible_values:
                     continue
 
-                value = sudoku.board[related[1]][related[0]]
+                value = self.sudoku.board[related[1]][related[0]]
 
                 if value in element_values:
-                    sudoku.possible_values[element].remove(value)
+                    self.sudoku.possible_values[element].remove(value)
 
-                    if len(sudoku.possible_values[element]) == 1:
-                        (last_val,) = sudoku.possible_values[element]
+                    if len(self.sudoku.possible_values[element]) == 1:
+                        (last_val,) = self.sudoku.possible_values[element]
                         self.sudoku.board[element[1]][element[0]] = last_val
                         del self.sudoku.possible_values[element]
                         changed = True
 
             if changed:
-                related_unfinished = sudoku.get_unfinished_cells(
-                    r_all
-                )
+                related_unfinished = self.sudoku.get_unfinished_cells(r_all)
                 for item in related_unfinished:
                     queue.add(item)
 
 
-def sudoku_solver(board: Board, strategy: Strategy = 'AC-3', display: bool = False):
+def sudoku_solver(board: Board, strategy: Strategy = 'AC-3'):
     if strategy == "MIN_CONFLICT":
-        solver = HillClimbingSolver(board, display=display)
+        solver = HillClimbingSolver(board)
     elif strategy == "FC":
         solver = CSPSolver(board)
     elif strategy == "AC-3":

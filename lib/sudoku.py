@@ -1,45 +1,41 @@
-import numpy as np
 from typing import (
-    Dict, Tuple, Set
+    Tuple, Set
 )
-from lib.typing import Board
+from lib.typing import Board, Domain
 
 
 class Sudoku:
     board: Board
-    possible_values: Dict[Tuple[int, int], Set[int]]
+    possible_values: Domain
 
     def __init__(self, board: Board, possible_values=None):
-        self.board = np.copy(board)
-
+        self.board = board
         if possible_values is None:
             self.possible_values = self.initial_possible_values()
         else:
             self.possible_values = possible_values
 
-    def initial_possible_values(self) -> Dict[Tuple[int, int], Set[int]]:
+    def initial_possible_values(self) -> Domain:
         possibilities = dict()
 
-        for i in range(0, 9):
-            for j in range(0, 9):
-                if self.board[i][j] == 0:
-                    possibilities[(j, i)] = self.find_domain(i, j)
+        for y in range(0, 9):
+            for x in range(0, 9):
+                if self.board[y][x] == 0:
+                    possibilities[(x, y)] = self.find_domain((x, y))
 
         return possibilities
 
-    def find_domain(self, row: int, col: int) -> Set[int]:
+    def find_domain(self, coords: Tuple[int, int]) -> Set[int]:
         domain = {1, 2, 3, 4, 5, 6, 7, 8, 9}
         for i in range(len(self.board)):
-            domain -= {self.board[i][col]}
+            domain -= {self.board[i][coords[0]]}
+            domain -= {self.board[coords[1]][i]}
 
-        for j in range(len(self.board)):
-            domain -= {self.board[row][j]}
-
-        i_box = (row//3) * 3
-        j_box = (col//3) * 3
-        for i in range(i_box, i_box + 3):
-            for j in range(j_box, j_box + 3):
-                domain -= {self.board[i][j]}
+        x_box = (coords[0]//3) * 3
+        y_box = (coords[1]//3) * 3
+        for y in range(y_box, y_box + 3):
+            for x in range(x_box, x_box + 3):
+                domain -= {self.board[y][x]}
 
         return domain
 
@@ -52,7 +48,7 @@ class Sudoku:
                 return False
         return True
 
-    def set_value(self, coords, value):
+    def set_value(self, coords: Tuple[int, int], value: int) -> bool:
         if coords not in self.possible_values or value not in self.possible_values[coords]:
             return False
 
@@ -67,7 +63,6 @@ class Sudoku:
                 continue
 
             related_values = self.possible_values[related]
-
             related_values.discard(value)
 
             if len(related_values) == 0:
@@ -90,10 +85,9 @@ class Sudoku:
 def calculate_relations():
     related_cells = dict()
 
-    for r in range(0, 9):
-        for c in range(0, 9):
-            coords = (c, r)
-            related_cells[coords] = get_related_cells(coords)
+    for y in range(0, 9):
+        for x in range(0, 9):
+            related_cells[(x, y)] = get_related_cells((x, y))
 
     return related_cells
 
@@ -105,12 +99,12 @@ def get_related_cells(coords):
         related.append((i, coords[1]))
         related.append((coords[0], i))
 
-    square_x = int((coords[0]) / 3) * 3
-    square_y = int((coords[1]) / 3) * 3
+    x_box = (coords[0]//3) * 3
+    y_box = (coords[1]//3) * 3
 
-    for x in range(0, 3):
-        for y in range(0, 3):
-            related.append((square_x + x, square_y + y))
+    for x in range(x_box, x_box + 3):
+        for y in range(y_box, y_box + 3):
+            related.append((x, y))
 
     related_set = set(related)
     related_set.remove(coords)
