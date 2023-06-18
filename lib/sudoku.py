@@ -1,5 +1,5 @@
 from typing import (
-    Tuple, Set
+    Dict, List, Tuple, Set
 )
 from lib.typing import Board, Domain
 
@@ -75,14 +75,8 @@ class Sudoku:
 
         return True
 
-    def get_unfinished_possible_values(self):
-        return set(k for k, v in self.possible_values.items())
 
-    def get_unfinished_cells(self, coord_set):
-        return [coord for coord in coord_set if coord in self.possible_values]
-
-
-def calculate_relations():
+def calculate_relations() -> Dict[Tuple[int, int], Set[Tuple[int, int]]]:
     related_cells = dict()
 
     for y in range(0, 9):
@@ -92,7 +86,7 @@ def calculate_relations():
     return related_cells
 
 
-def get_related_cells(coords):
+def get_related_cells(coords) -> Set[Tuple[int, int]]:
     related = list()
 
     for i in range(0, 9):

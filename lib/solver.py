@@ -63,7 +63,7 @@ class HillClimbingSolver(Solver):
             coords, values = min(queue, key=lambda item: len(item[1]))
 
             if len(values) == 1:
-                if not sudoku.set_value(coords, next(iter(values))):
+                if not sudoku.set_value(coords, next(iter(values))):  # type: ignore
                     return False
                 continue
 
@@ -142,39 +142,26 @@ class AC3Solver(CSPSolver):
     def __init__(self, sudoku, possible_values=None, *args, **kwargs):
         super().__init__(sudoku, possible_values, *args, **kwargs)
         if possible_values is None:
-            self.ac3_all()
+            self.check_arc_consistency()
             self.is_valid = self.sudoku.is_valid()
 
-    def ac3_all(self):
-        queue = self.sudoku.get_unfinished_possible_values()
+    def check_arc_consistency(self):
+        queue = {k for k in self.sudoku.possible_values.keys()}
 
-        while len(queue) > 0:
-            element = queue.pop()
-            element_values = self.sudoku.possible_values[element]
-
-            r_all = RELATED_CELLS[element]
-
-            changed = False
-
-            for related in r_all:
-                if element not in self.sudoku.possible_values:
+        while len(queue) != 0:
+            cell = queue.pop()
+            related_arcs = RELATED_CELLS[cell]
+            for related in related_arcs:
+                if related not in self.sudoku.possible_values:
                     continue
 
-                value = self.sudoku.board[related[1]][related[0]]
+                related_values = self.sudoku.possible_values[related]
+                inconsistent_values = set()
+                for value in self.sudoku.possible_values[cell]:
+                    if len(related_values - {value}) == 0:
+                        inconsistent_values.add(value)
 
-                if value in element_values:
-                    self.sudoku.possible_values[element].remove(value)
-
-                    if len(self.sudoku.possible_values[element]) == 1:
-                        (last_val,) = self.sudoku.possible_values[element]
-                        self.sudoku.board[element[1]][element[0]] = last_val
-                        del self.sudoku.possible_values[element]
-                        changed = True
-
-            if changed:
-                related_unfinished = self.sudoku.get_unfinished_cells(r_all)
-                for item in related_unfinished:
-                    queue.add(item)
+                self.sudoku.possible_values[cell] -= inconsistent_values
 
 
 def sudoku_solver(board: Board, strategy: Strategy = 'AC-3'):
