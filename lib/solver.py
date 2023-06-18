@@ -149,8 +149,10 @@ class AC3Solver(CSPSolver):
         queue = {k for k in self.sudoku.possible_values.keys()}
 
         while len(queue) != 0:
+            changed = False
             cell = queue.pop()
             related_arcs = RELATED_CELLS[cell]
+
             for related in related_arcs:
                 if related not in self.sudoku.possible_values:
                     continue
@@ -159,9 +161,13 @@ class AC3Solver(CSPSolver):
                 inconsistent_values = set()
                 for value in self.sudoku.possible_values[cell]:
                     if len(related_values - {value}) == 0:
+                        changed = True
                         inconsistent_values.add(value)
 
                 self.sudoku.possible_values[cell] -= inconsistent_values
+
+            if changed:
+                queue |= {coord for coord in related_arcs if coord in self.sudoku.possible_values}
 
 
 def sudoku_solver(board: Board, strategy: Strategy = 'AC-3'):
