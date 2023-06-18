@@ -99,6 +99,22 @@ class CSPSolver(Solver):
         self.sudoku = Sudoku(sudoku, possible_values)
         self.is_valid = True
 
+    # def pairs_heuristic(self):
+    #     for cell in self.sudoku.possible_values.keys():
+    #         relates = RELATED_CELLS[cell]
+    #         for related in relates:
+    #             if related not in self.sudoku.possible_values:
+    #                 continue
+
+    #             if self.sudoku.possible_values[cell] == self.sudoku.possible_values[related] and len(self.sudoku.possible_values[cell]) == 2:
+    #                 for item in self.sudoku.possible_values.keys():
+    #                     if cell[0] == related[0]:
+    #                         if (item[0] == cell[0]) and (item[1] != cell[1]) and (item[1] != related[1]):
+    #                             self.sudoku.possible_values[item] -= self.sudoku.possible_values[cell]
+    #                     elif cell[1] == related[1]:
+    #                         if item[1] == cell[1] and (item[0] != cell[0]) and (item[0] != related[0]):
+    #                             self.sudoku.possible_values[item] -= self.sudoku.possible_values[cell]
+
     def apply_value(self, coord, value):
         new_possible_values = {k: v.copy() for k, v in self.sudoku.possible_values.items()}
         new_board = np.copy(self.sudoku.board)
@@ -112,6 +128,7 @@ class CSPSolver(Solver):
         return new_solver
 
     def search(self):
+        # self.naked_pairs_heuristic()
         queue = [(k, v) for k, v in self.sudoku.possible_values.items()]
         coords, values = min(queue, key=lambda item: len(item[1]))
 
